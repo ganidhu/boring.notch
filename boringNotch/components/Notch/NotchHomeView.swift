@@ -314,20 +314,33 @@ private struct ReferenceWaveform: View {
     private let barCount = 7
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: isPlaying ? 0.12 : nil)) { timeline in
+        TimelineView(.periodic(from: .now, by: 0.12)) { timeline in
             HStack(alignment: .center, spacing: 3) {
                 ForEach(0..<barCount, id: \.self) { index in
-                    let time = timeline.date.timeIntervalSinceReferenceDate
-                    let wave = abs(sin(time * (2.4 + Double(index) * 0.13) + Double(index) * 0.8))
-                    let activeHeight = CGFloat(10 + (wave * 22))
-                    let height: CGFloat = isPlaying ? activeHeight : CGFloat(12 + ((index * 5) % 9))
-
-                    Capsule()
-                        .fill(Color(red: 0.95, green: 0.48, blue: 0.57))
-                        .frame(width: 4, height: height)
+                    waveBar(index: index, date: timeline.date)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
+    }
+
+    private func waveBar(index: Int, date: Date) -> some View {
+        let height = barHeight(index: index, date: date)
+
+        return Capsule()
+            .fill(Color(red: 0.95, green: 0.48, blue: 0.57))
+            .frame(width: 4, height: height)
+    }
+
+    private func barHeight(index: Int, date: Date) -> CGFloat {
+        guard isPlaying else {
+            return CGFloat(12 + ((index * 5) % 9))
+        }
+
+        let time = date.timeIntervalSinceReferenceDate
+        let speed = 2.4 + (Double(index) * 0.13)
+        let phase = Double(index) * 0.8
+        let wave = abs(sin((time * speed) + phase))
+        return CGFloat(10 + (wave * 22))
     }
 }
