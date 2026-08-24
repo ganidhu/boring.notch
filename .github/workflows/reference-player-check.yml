@@ -1,0 +1,39 @@
+name: Reference Player Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ganidhu/reference-spotify-hover
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode version
+        run: xcodebuild -version
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project boringNotch.xcodeproj
+      - name: Build unsigned debug app
+        run: |
+          xcodebuild \
+            -project boringNotch.xcodeproj \
+            -scheme boringNotch \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+      - name: Package test app
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug/boringNotch.app"
+          test -d "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" boringNotch-test.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boringNotch-reference-player
+          path: boringNotch-test.zip
