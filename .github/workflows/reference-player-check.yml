@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - ganidhu/reference-spotify-hover
+  pull_request:
+    branches:
+      - ganidhu/reference-spotify-hover
 
 permissions:
   contents: read
