@@ -70,19 +70,19 @@ struct NotchHomeView: View {
             Color.clear
                 .frame(height: max(vm.effectiveClosedNotchHeight, 34) + 8)
 
-            HStack(spacing: 18) {
+            HStack(spacing: 14) {
                 artwork
-                    .frame(width: 92, height: 92)
+                    .frame(width: 76, height: 76)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(spotifyReady ? musicManager.songTitle : "Spotify")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     Text(spotifyReady ? musicManager.artistName : "Open Spotify to start playing")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.58))
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -90,16 +90,16 @@ struct NotchHomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 ReferenceWaveform(isPlaying: musicManager.isPlaying)
-                    .frame(width: 34, height: 28)
+                    .frame(width: 30, height: 22)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 22)
 
             Spacer(minLength: 10)
 
             TimelineView(.animation(minimumInterval: musicManager.isPlaying ? 0.12 : nil)) { timeline in
                 progressRow(date: timeline.date)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 22)
             .padding(.bottom, 13)
         }
     }
@@ -143,16 +143,16 @@ struct NotchHomeView: View {
                             .scaledToFill()
                     }
                 }
-                .frame(width: 92, height: 92)
-                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .frame(width: 76, height: 76)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 AppIcon(for: "com.spotify.client")
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 31, height: 31)
+                    .frame(width: 25, height: 25)
                     .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.42), radius: 4, y: 2)
-                    .offset(x: 4, y: 4)
+                    .shadow(color: .black.opacity(0.42), radius: 3, y: 1)
+                    .offset(x: 3, y: 3)
             }
         }
         .buttonStyle(.plain)
@@ -165,9 +165,9 @@ struct NotchHomeView: View {
         let duration = max(musicManager.songDuration, 0)
         let remaining = max(duration - livePosition, 0)
 
-        return HStack(spacing: 11) {
+        return HStack(spacing: 8) {
             Text(timeString(livePosition))
-                .frame(width: 43, alignment: .leading)
+                .frame(width: 38, alignment: .leading)
 
             ReferenceScrubber(
                 value: isScrubbing ? scrubPosition : livePosition,
@@ -179,9 +179,9 @@ struct NotchHomeView: View {
             .frame(height: 13)
 
             Text("-\(timeString(remaining))")
-                .frame(width: 49, alignment: .trailing)
+                .frame(width: 44, alignment: .trailing)
         }
-        .font(.system(size: 13, weight: .semibold))
+        .font(.system(size: 11.5, weight: .semibold))
         .foregroundStyle(Color.white.opacity(0.58))
     }
 
@@ -189,7 +189,7 @@ struct NotchHomeView: View {
         HStack(spacing: 0) {
             ReferenceTransportButton(
                 systemName: "shuffle",
-                size: 21,
+                size: 17,
                 active: musicManager.isShuffled,
                 action: musicManager.toggleShuffle
             )
@@ -198,7 +198,7 @@ struct NotchHomeView: View {
 
             ReferenceTransportButton(
                 systemName: "backward.fill",
-                size: 31,
+                size: 24,
                 action: musicManager.previousTrack
             )
 
@@ -206,16 +206,16 @@ struct NotchHomeView: View {
 
             ReferenceTransportButton(
                 systemName: musicManager.isPlaying ? "pause.fill" : "play.fill",
-                size: 36,
+                size: 28,
                 action: musicManager.togglePlay
             )
-            .frame(width: 48)
+            .frame(width: 42)
 
             Spacer()
 
             ReferenceTransportButton(
                 systemName: "forward.fill",
-                size: 31,
+                size: 24,
                 action: musicManager.nextTrack
             )
 
@@ -223,7 +223,7 @@ struct NotchHomeView: View {
 
             ReferenceTransportButton(
                 systemName: "laptopcomputer",
-                size: 22,
+                size: 18,
                 muted: true,
                 action: openSoundSettings
             )
@@ -280,13 +280,13 @@ private struct ReferenceScrubber: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.16))
-                    .frame(height: 6)
+                    .frame(height: 4.5)
 
                 Capsule()
                     .fill(Color.white.opacity(0.96))
                     .frame(
-                        width: max(normalized * width, normalized > 0 ? 6 : 0),
-                        height: 6
+                        width: max(normalized * width, normalized > 0 ? 5 : 0),
+                        height: 4.5
                     )
             }
             .frame(maxHeight: .infinity, alignment: .center)
@@ -331,7 +331,7 @@ private struct ReferenceTransportButton: View {
                         ? Color(red: 0.96, green: 0.49, blue: 0.58)
                         : Color.white.opacity(muted ? 0.58 : 0.97)
                 )
-                .frame(minWidth: 36, minHeight: 42)
+                .frame(minWidth: 34, minHeight: 36)
                 .scaleEffect(hovering ? 1.06 : 1)
                 .animation(.easeOut(duration: 0.12), value: hovering)
         }
@@ -342,15 +342,20 @@ private struct ReferenceTransportButton: View {
 
 struct ReferenceWaveform: View {
     let isPlaying: Bool
+
     private let barCount = 7
+    private let profile: [Double] = [0.42, 0.72, 0.94, 0.58, 1.0, 0.76, 0.48]
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.12)) { timeline in
-            HStack(alignment: .center, spacing: 2) {
+        TimelineView(.periodic(from: .now, by: 0.10)) { timeline in
+            HStack(alignment: .center, spacing: 2.2) {
                 ForEach(0..<barCount, id: \.self) { index in
                     Capsule()
                         .fill(Color(red: 0.95, green: 0.48, blue: 0.57))
-                        .frame(width: 3, height: barHeight(index: index, date: timeline.date))
+                        .frame(
+                            width: 2.4,
+                            height: barHeight(index: index, date: timeline.date)
+                        )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -358,15 +363,20 @@ struct ReferenceWaveform: View {
     }
 
     private func barHeight(index: Int, date: Date) -> CGFloat {
+        let shape = profile[index]
+
         guard isPlaying else {
-            return CGFloat(7 + ((index * 4) % 8))
+            return CGFloat(4.5 + (shape * 5.5))
         }
 
         let time = date.timeIntervalSinceReferenceDate
-        let speed = 2.4 + (Double(index) * 0.13)
-        let phase = Double(index) * 0.8
-        let wave = abs(sin((time * speed) + phase))
-        return CGFloat(7 + (wave * 17))
+        let phase = Double(index) * 0.73
+        let primary = (sin((time * (2.0 + Double(index) * 0.09)) + phase) + 1) * 0.5
+        let secondary = (sin((time * 3.15) + phase * 1.7) + 1) * 0.5
+        let energy = 0.30 + ((primary * 0.68 + secondary * 0.32) * 0.70)
+        let shapedEnergy = (0.68 + shape * 0.32) * energy
+
+        return CGFloat(4.5 + shapedEnergy * 13.5)
     }
 }
 
