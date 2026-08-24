@@ -102,9 +102,9 @@ class BoringViewCoordinator: ObservableObject {
     private var hudReplacementCancellable: AnyCancellable?
 
     private init() {
-        // This fork starts directly in the Spotify hover player.
+        // This fork starts directly in the Spotify hover player while preserving
+        // the user's live activity preference.
         firstLaunch = false
-        musicLiveActivityEnabled = false
         currentView = .home
 
         // Perform migration from name-based to UUID-based storage
@@ -132,9 +132,11 @@ class BoringViewCoordinator: ObservableObject {
             forName: Notification.Name.accessibilityAuthorizationChanged,
             object: nil,
             queue: .main
-        ) { _ in
+        ) { notification in
             Task { @MainActor in
-                if Defaults[.hudReplacement] {
+                guard Defaults[.hudReplacement] else { return }
+                let granted = notification.userInfo?["granted"] as? Bool ?? false
+                if granted {
                     await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
                 }
             }
