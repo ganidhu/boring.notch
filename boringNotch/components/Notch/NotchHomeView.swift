@@ -1,36 +1,15 @@
-//
-//  NotchHomeView.swift
-//  boringNotch
-//
-//  Spotify-first hover player, styled from the supplied reference.
-//
-
 import AppKit
 import SwiftUI
 
-// MARK: - Main View
-
 struct NotchHomeView: View {
-    @EnvironmentObject var vm: BoringViewModel
-    let albumArtNamespace: Namespace.ID
-
-    var body: some View {
-        SpotifyReferencePlayerView(albumArtNamespace: albumArtNamespace)
-            .environmentObject(vm)
-            .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-    }
-}
-
-// MARK: - Reference Spotify Player
-
-private struct SpotifyReferencePlayerView: View {
-    @EnvironmentObject var vm: BoringViewModel
+    @EnvironmentObject private var vm: BoringViewModel
     @ObservedObject private var musicManager = MusicManager.shared
 
     let albumArtNamespace: Namespace.ID
 
     @State private var scrubPosition: Double = 0
     @State private var isScrubbing = false
+    @State private var swipeBlocked = false
 
     private var spotifyReady: Bool {
         musicManager.bundleIdentifier == "com.spotify.client"
@@ -38,32 +17,37 @@ private struct SpotifyReferencePlayerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            topRow
-                .padding(.horizontal, 16)
+            topBlackSection
+                .frame(height: 205)
+                .background(.black)
 
-            Spacer(minLength: 24)
-
-            TimelineView(.animation(minimumInterval: musicManager.isPlaying ? 0.12 : nil)) { timeline in
-                progressRow(date: timeline.date)
-            }
-            .padding(.horizontal, 16)
-
-            Spacer(minLength: 26)
-
-            transportControls
-                .padding(.horizontal, 34)
-
-            Spacer(minLength: 24)
+            glassControlsSection
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(.top, 18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(width: openNotchSize.width, height: openNotchSize.height)
+        .clipShape(
+            NotchShape(
+                topCornerRadius: cornerRadiusInsets.opened.top,
+                bottomCornerRadius: cornerRadiusInsets.opened.bottom
+            )
+        )
+        .overlay {
+            NotchShape(
+                topCornerRadius: cornerRadiusInsets.opened.top,
+                bottomCornerRadius: cornerRadiusInsets.opened.bottom
+            )
+            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.42), radius: 12, y: 6)
+        .contentShape(Rectangle())
+        .simultaneousGesture(swipeGesture)
         .onAppear {
             musicManager.forceUpdate()
             scrubPosition = musicManager.elapsedTime
         }
-        .onChange(of: musicManager.elapsedTime) { _, newValue in
+        .onChange(of: musicManager.elapsedTime) { _, value in
             guard !isScrubbing else { return }
-            scrubPosition = newValue
+            scrubPosition = value
         }
         .onChange(of: musicManager.songTitle) { _, _ in
             guard !isScrubbing else { return }
@@ -71,31 +55,68 @@ private struct SpotifyReferencePlayerView: View {
         }
     }
 
-    private var topRow: some View {
-        HStack(spacing: 26) {
-            artwork
-                .frame(width: 134, height: 134)
+    private var topBlackSection: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: max(vm.effectiveClosedNotchHeight, 34) + 8)
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(spotifyReady ? musicManager.songTitle : "Spotify")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            HStack(spacing: 18) {
+                artwork
+                    .frame(width: 92, height: 92)
 
-                Text(spotifyReady ? musicManager.artistName : "Open Spotify to start playing")
-                    .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.58))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(spotifyReady ? musicManager.songTitle : "Spotify")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Text(spotifyReady ? musicManager.artistName : "Open Spotify to start playing")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.58))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                ReferenceWaveform(isPlaying: musicManager.isPlaying)
+                    .frame(width: 34, height: 28)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18)
 
-            ReferenceWaveform(isPlaying: musicManager.isPlaying)
-                .frame(width: 46, height: 34)
-                .padding(.trailing, 2)
+            Spacer(minLength: 10)
+
+            TimelineView(.animation(minimumInterval: musicManager.isPlaying ? 0.12 : nil)) { timeline in
+                progressRow(date: timeline.date)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 13)
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private var glassControlsSection: some View {
+        ZStack {
+            ReferenceGlassBackdrop()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.22),
+                    Color.black.opacity(0.42)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.075))
+                    .frame(height: 1)
+
+                transportControls
+                    .padding(.horizontal, 28)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
     }
 
     private var artwork: some View {
@@ -113,16 +134,16 @@ private struct SpotifyReferencePlayerView: View {
                             .scaledToFill()
                     }
                 }
-                .frame(width: 134, height: 134)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .frame(width: 92, height: 92)
+                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                 AppIcon(for: "com.spotify.client")
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 46, height: 46)
+                    .frame(width: 31, height: 31)
                     .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
-                    .offset(x: 6, y: 6)
+                    .shadow(color: .black.opacity(0.42), radius: 4, y: 2)
+                    .offset(x: 4, y: 4)
             }
         }
         .buttonStyle(.plain)
@@ -135,67 +156,65 @@ private struct SpotifyReferencePlayerView: View {
         let duration = max(musicManager.songDuration, 0)
         let remaining = max(duration - livePosition, 0)
 
-        return HStack(spacing: 14) {
+        return HStack(spacing: 11) {
             Text(timeString(livePosition))
-                .frame(width: 64, alignment: .leading)
+                .frame(width: 43, alignment: .leading)
 
             ReferenceScrubber(
                 value: isScrubbing ? scrubPosition : livePosition,
                 duration: duration,
                 isScrubbing: $isScrubbing,
                 scrubPosition: $scrubPosition,
-                onSeek: { newPosition in
-                    musicManager.seek(to: newPosition)
-                }
+                onSeek: musicManager.seek(to:)
             )
-            .frame(height: 16)
+            .frame(height: 13)
 
             Text("-\(timeString(remaining))")
-                .frame(width: 64, alignment: .trailing)
+                .frame(width: 49, alignment: .trailing)
         }
-        .font(.system(size: 21, weight: .semibold))
-        .foregroundStyle(Color.white.opacity(0.56))
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(Color.white.opacity(0.58))
     }
 
     private var transportControls: some View {
-        HStack(alignment: .center, spacing: 0) {
+        HStack(spacing: 0) {
             ReferenceTransportButton(
                 systemName: "shuffle",
-                size: 28,
+                size: 21,
                 active: musicManager.isShuffled,
-                action: { musicManager.toggleShuffle() }
+                action: musicManager.toggleShuffle
             )
 
             Spacer()
 
             ReferenceTransportButton(
                 systemName: "backward.fill",
-                size: 42,
-                action: { musicManager.previousTrack() }
+                size: 31,
+                action: musicManager.previousTrack
             )
 
             Spacer()
 
             ReferenceTransportButton(
                 systemName: musicManager.isPlaying ? "pause.fill" : "play.fill",
-                size: 52,
-                action: { musicManager.togglePlay() }
+                size: 36,
+                action: musicManager.togglePlay
             )
-            .frame(width: 62)
+            .frame(width: 48)
 
             Spacer()
 
             ReferenceTransportButton(
                 systemName: "forward.fill",
-                size: 42,
-                action: { musicManager.nextTrack() }
+                size: 31,
+                action: musicManager.nextTrack
             )
 
             Spacer()
 
             ReferenceTransportButton(
                 systemName: "laptopcomputer",
-                size: 29,
+                size: 22,
                 muted: true,
                 action: openSoundSettings
             )
@@ -203,15 +222,47 @@ private struct SpotifyReferencePlayerView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 18)
+            .onChanged { _ in
+                if isScrubbing {
+                    swipeBlocked = true
+                }
+            }
+            .onEnded { gesture in
+                defer { swipeBlocked = false }
+
+                guard !swipeBlocked else { return }
+
+                let horizontal = gesture.translation.width
+                let vertical = gesture.translation.height
+                guard abs(horizontal) > 58,
+                      abs(horizontal) > abs(vertical) * 1.35
+                else { return }
+
+                if horizontal < 0 {
+                    musicManager.nextTrack()
+                } else {
+                    musicManager.previousTrack()
+                }
+            }
+    }
+
     private func openSpotify() {
-        let bundleID = "com.spotify.client"
-        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
-        let configuration = NSWorkspace.OpenConfiguration()
-        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+        guard let appURL = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: "com.spotify.client"
+        ) else { return }
+
+        NSWorkspace.shared.openApplication(
+            at: appURL,
+            configuration: NSWorkspace.OpenConfiguration()
+        )
     }
 
     private func openSoundSettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") else { return }
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.Sound-Settings.extension"
+        ) else { return }
         NSWorkspace.shared.open(url)
     }
 
@@ -229,8 +280,6 @@ private struct SpotifyReferencePlayerView: View {
     }
 }
 
-// MARK: - Progress
-
 private struct ReferenceScrubber: View {
     let value: Double
     let duration: Double
@@ -241,16 +290,21 @@ private struct ReferenceScrubber: View {
     var body: some View {
         GeometryReader { geometry in
             let width = max(geometry.size.width, 1)
-            let normalized = duration > 0 ? CGFloat(min(max(value / duration, 0), 1)) : 0
+            let normalized = duration > 0
+                ? CGFloat(min(max(value / duration, 0), 1))
+                : 0
 
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.16))
-                    .frame(height: 10)
+                    .frame(height: 6)
 
                 Capsule()
                     .fill(Color.white.opacity(0.96))
-                    .frame(width: max(normalized * width, normalized > 0 ? 10 : 0), height: 10)
+                    .frame(
+                        width: max(normalized * width, normalized > 0 ? 6 : 0),
+                        height: 6
+                    )
             }
             .frame(maxHeight: .infinity, alignment: .center)
             .contentShape(Rectangle())
@@ -275,13 +329,11 @@ private struct ReferenceScrubber: View {
     }
 }
 
-// MARK: - Transport Controls
-
 private struct ReferenceTransportButton: View {
     let systemName: String
     let size: CGFloat
-    var active: Bool = false
-    var muted: Bool = false
+    var active = false
+    var muted = false
     let action: () -> Void
 
     @State private var hovering = false
@@ -294,11 +346,10 @@ private struct ReferenceTransportButton: View {
                 .foregroundStyle(
                     active
                         ? Color(red: 0.96, green: 0.49, blue: 0.58)
-                        : Color.white.opacity(muted ? 0.56 : 0.97)
+                        : Color.white.opacity(muted ? 0.58 : 0.97)
                 )
-                .frame(minWidth: 44, minHeight: 52)
+                .frame(minWidth: 36, minHeight: 42)
                 .scaleEffect(hovering ? 1.06 : 1)
-                .opacity(hovering ? 1 : 0.96)
                 .animation(.easeOut(duration: 0.12), value: hovering)
         }
         .buttonStyle(.plain)
@@ -306,41 +357,49 @@ private struct ReferenceTransportButton: View {
     }
 }
 
-// MARK: - Visualizer
-
-private struct ReferenceWaveform: View {
+struct ReferenceWaveform: View {
     let isPlaying: Bool
-
     private let barCount = 7
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.12)) { timeline in
-            HStack(alignment: .center, spacing: 3) {
+            HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<barCount, id: \.self) { index in
-                    waveBar(index: index, date: timeline.date)
+                    Capsule()
+                        .fill(Color(red: 0.95, green: 0.48, blue: 0.57))
+                        .frame(width: 3, height: barHeight(index: index, date: timeline.date))
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-
-    private func waveBar(index: Int, date: Date) -> some View {
-        let height = barHeight(index: index, date: date)
-
-        return Capsule()
-            .fill(Color(red: 0.95, green: 0.48, blue: 0.57))
-            .frame(width: 4, height: height)
     }
 
     private func barHeight(index: Int, date: Date) -> CGFloat {
         guard isPlaying else {
-            return CGFloat(12 + ((index * 5) % 9))
+            return CGFloat(7 + ((index * 4) % 8))
         }
 
         let time = date.timeIntervalSinceReferenceDate
         let speed = 2.4 + (Double(index) * 0.13)
         let phase = Double(index) * 0.8
         let wave = abs(sin((time * speed) + phase))
-        return CGFloat(10 + (wave * 22))
+        return CGFloat(7 + (wave * 17))
+    }
+}
+
+private struct ReferenceGlassBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.isEmphasized = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = .hudWindow
+        nsView.blendingMode = .behindWindow
+        nsView.state = .active
     }
 }
