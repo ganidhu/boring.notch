@@ -9,20 +9,22 @@ struct NotchHomeView: View {
 
     @State private var scrubPosition: Double = 0
     @State private var isScrubbing = false
-    @State private var swipeBlocked = false
 
     private var spotifyReady: Bool {
         musicManager.bundleIdentifier == "com.spotify.client"
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            topBlackSection
-                .frame(height: 205)
-                .background(.black)
+        ZStack {
+            playerBackdrop
 
-            glassControlsSection
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                topBlackSection
+                    .frame(height: 205)
+
+                glassControlsSection
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .frame(width: openNotchSize.width, height: openNotchSize.height)
         .clipShape(
@@ -40,7 +42,15 @@ struct NotchHomeView: View {
         }
         .shadow(color: .black.opacity(0.42), radius: 12, y: 6)
         .contentShape(Rectangle())
-        .simultaneousGesture(swipeGesture)
+        .horizontalTrackpadSwipe(threshold: 48) { direction in
+            guard !isScrubbing else { return }
+            switch direction {
+            case .left:
+                musicManager.nextTrack()
+            case .right:
+                musicManager.previousTrack()
+            }
+        }
         .onAppear {
             musicManager.forceUpdate()
             scrubPosition = musicManager.elapsedTime
@@ -95,27 +105,26 @@ struct NotchHomeView: View {
     }
 
     private var glassControlsSection: some View {
+        transportControls
+            .padding(.horizontal, 28)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var playerBackdrop: some View {
         ZStack {
             ReferenceGlassBackdrop()
 
             LinearGradient(
-                colors: [
-                    Color.black.opacity(0.22),
-                    Color.black.opacity(0.42)
+                stops: [
+                    .init(color: .black, location: 0.0),
+                    .init(color: .black, location: 0.50),
+                    .init(color: .black.opacity(0.90), location: 0.62),
+                    .init(color: .black.opacity(0.62), location: 0.76),
+                    .init(color: .black.opacity(0.38), location: 1.0),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-
-            VStack(spacing: 0) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.075))
-                    .frame(height: 1)
-
-                transportControls
-                    .padding(.horizontal, 28)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         }
     }
 
@@ -220,32 +229,6 @@ struct NotchHomeView: View {
             )
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 18)
-            .onChanged { _ in
-                if isScrubbing {
-                    swipeBlocked = true
-                }
-            }
-            .onEnded { gesture in
-                defer { swipeBlocked = false }
-
-                guard !swipeBlocked else { return }
-
-                let horizontal = gesture.translation.width
-                let vertical = gesture.translation.height
-                guard abs(horizontal) > 58,
-                      abs(horizontal) > abs(vertical) * 1.35
-                else { return }
-
-                if horizontal < 0 {
-                    musicManager.nextTrack()
-                } else {
-                    musicManager.previousTrack()
-                }
-            }
     }
 
     private func openSpotify() {

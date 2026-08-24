@@ -44,6 +44,16 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .sensoryFeedback(.alignment, trigger: haptics)
+        .conditionalModifier(Defaults[.enableGestures]) { view in
+            view.panGesture(direction: .down) { translation, phase in
+                handleDownGesture(translation: translation, phase: phase)
+            }
+        }
+        .conditionalModifier(Defaults[.closeGestureEnabled] && Defaults[.enableGestures]) { view in
+            view.panGesture(direction: .up) { translation, phase in
+                handleUpGesture(translation: translation, phase: phase)
+            }
+        }
         .onDisappear {
             hoverTask?.cancel()
         }
@@ -214,6 +224,39 @@ struct ContentView: View {
     private func closeNotch() {
         withAnimation(animationSpring) {
             vm.close()
+        }
+    }
+
+    private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        guard vm.notchState == .closed else { return }
+
+        if phase == .ended {
+            gestureProgress = 0
+            return
+        }
+
+        gestureProgress = (translation / Defaults[.gestureSensitivity]) * 20
+        if translation > Defaults[.gestureSensitivity] {
+            gestureProgress = 0
+            if enableHaptics { haptics.toggle() }
+            openNotch()
+        }
+    }
+
+    private func handleUpGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        guard vm.notchState == .open && !vm.isHoveringCalendar else { return }
+
+        if phase == .ended {
+            gestureProgress = 0
+            return
+        }
+
+        gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20
+        if translation > Defaults[.gestureSensitivity] {
+            gestureProgress = 0
+            isHovering = false
+            if enableHaptics { haptics.toggle() }
+            closeNotch()
         }
     }
 }

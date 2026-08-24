@@ -143,3 +143,126 @@ private struct ScrollMonitor: NSViewRepresentable {
         }
     }
 }
+
+
+enum HorizontalTrackpadSwipeDirection {
+    case left
+    case right
+}
+
+extension View {
+    /// Tracks deliberate horizontal two-finger swipes without adding a DragGesture.
+    /// Playback scrubber drags therefore remain independent from track navigation.
+    func horizontalTrackpadSwipe(
+        threshold: CGFloat = 48,
+        action: @escaping (HorizontalTrackpadSwipeDirection) -> Void
+    ) -> some View {
+        background(
+            HorizontalTrackpadSwipeMonitor(threshold: threshold, action: action)
+        )
+    }
+}
+
+private struct HorizontalTrackpadSwipeMonitor: NSViewRepresentable {
+    let threshold: CGFloat
+    let action: (HorizontalTrackpadSwipeDirection) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.installMonitor(on: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.removeMonitor()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(threshold: threshold, action: action)
+    }
+
+    @MainActor final class Coordinator: NSObject {
+        private let threshold: CGFloat
+        private let action: (HorizontalTrackpadSwipeDirection) -> Void
+        private var monitor: Any?
+        private var accumulatedX: CGFloat = 0
+        private var fired = false
+        private var endTask: Task<Void, Never>?
+
+        init(threshold: CGFloat, action: @escaping (HorizontalTrackpadSwipeDirection) -> Void) {
+            self.threshold = threshold
+            self.action = action
+        }
+
+        func installMonitor(on view: NSView) {
+            removeMonitor()
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self, weak view] event in
+                guard let self, event.window === view?.window else { return event }
+                self.handle(event)
+                return event
+            }
+        }
+
+        func removeMonitor() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+            monitor = nil
+            endTask?.cancel()
+            endTask = nil
+            reset()
+        }
+
+        private func handle(_ event: NSEvent) {
+            // Ignore inertial momentum. Only the physical two-finger gesture can fire.
+            guard event.momentumPhase.isEmpty else { return }
+
+            if event.phase == .ended {
+                reset()
+                return
+            }
+
+            // Mouse wheels must never skip tracks accidentally.
+            guard event.hasPreciseScrollingDeltas else { return }
+
+            let dx = event.scrollingDeltaX
+            let dy = event.scrollingDeltaY
+            guard abs(dx) >= abs(dy) * 1.4 else { return }
+            guard abs(dx) > 0.35 else { return }
+
+            if !fired {
+                if accumulatedX != 0, dx != 0, (accumulatedX < 0) != (dx < 0) {
+                    accumulatedX = 0
+                }
+
+                accumulatedX += dx
+
+                if accumulatedX <= -threshold {
+                    fired = true
+                    action(.left)
+                } else if accumulatedX >= threshold {
+                    fired = true
+                    action(.right)
+                }
+            }
+
+            scheduleEndTimeout()
+        }
+
+        private func scheduleEndTimeout() {
+            endTask?.cancel()
+            endTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(260))
+                guard !Task.isCancelled else { return }
+                reset()
+            }
+        }
+
+        private func reset() {
+            accumulatedX = 0
+            fired = false
+        }
+    }
+}

@@ -12,6 +12,81 @@ import AVFoundation
 
 private let kSystemDefinedEventType = CGEventType(rawValue: 14)!
 
+@MainActor
+final class AccessibilityAuthorizationController {
+    static let shared = AccessibilityAuthorizationController()
+
+    private var lastKnownAuthorization = AXIsProcessTrusted()
+    private var monitoringTask: Task<Void, Never>?
+
+    private init() {}
+
+    var isAuthorized: Bool {
+        lastKnownAuthorization
+    }
+
+    @discardableResult
+    func refresh() -> Bool {
+        let granted = AXIsProcessTrusted()
+        if granted != lastKnownAuthorization {
+            lastKnownAuthorization = granted
+            NotificationCenter.default.post(
+                name: .accessibilityAuthorizationChanged,
+                object: nil,
+                userInfo: ["granted": granted]
+            )
+        }
+        return granted
+    }
+
+    func requestAuthorization() {
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+        startMonitoring()
+    }
+
+    func ensureAuthorization(promptIfNeeded: Bool) async -> Bool {
+        if refresh() { return true }
+
+        if promptIfNeeded {
+            requestAuthorization()
+        }
+
+        guard promptIfNeeded else { return false }
+
+        // TCC can publish the new state after System Settings closes or changes focus.
+        // Poll without clearing the user's HUD preference while that state catches up.
+        for _ in 0..<60 {
+            if Task.isCancelled { return false }
+            try? await Task.sleep(for: .milliseconds(500))
+            if refresh() { return true }
+        }
+        return refresh()
+    }
+
+    func startMonitoring(every interval: TimeInterval = 2.0) {
+        guard monitoringTask == nil else { return }
+        monitoringTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                _ = self.refresh()
+                try? await Task.sleep(for: .seconds(interval))
+            }
+        }
+    }
+
+    func stopMonitoring() {
+        monitoringTask?.cancel()
+        monitoringTask = nil
+    }
+}
+
+extension Notification.Name {
+    static let accessibilityAuthorizationChanged = Notification.Name("accessibilityAuthorizationChanged")
+}
+
 final class MediaKeyInterceptor {
     static let shared = MediaKeyInterceptor()
     
@@ -32,14 +107,18 @@ final class MediaKeyInterceptor {
     
     private init() {}
     
-    // MARK: - Accessibility (via XPC)
-    
+    // MARK: - Accessibility
+
     func requestAccessibilityAuthorization() {
-        XPCHelperClient.shared.requestAccessibilityAuthorization()
+        Task { @MainActor in
+            AccessibilityAuthorizationController.shared.requestAuthorization()
+        }
     }
-    
+
     func ensureAccessibilityAuthorization(promptIfNeeded: Bool = false) async -> Bool {
-        await XPCHelperClient.shared.ensureAccessibilityAuthorization(promptIfNeeded: promptIfNeeded)
+        await AccessibilityAuthorizationController.shared.ensureAuthorization(
+            promptIfNeeded: promptIfNeeded
+        )
     }
     
     // MARK: - Event Tap
@@ -53,8 +132,10 @@ final class MediaKeyInterceptor {
             return
         }
         
-        // Check accessibility authorization
-        let authorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
+        // The event tap is created by this process, so its TCC trust must be checked here.
+        let authorized = await MainActor.run {
+            AccessibilityAuthorizationController.shared.refresh()
+        }
         if !authorized {
             if promptIfNeeded {
                 let granted = await ensureAccessibilityAuthorization(promptIfNeeded: true)

@@ -102,8 +102,7 @@ class BoringViewCoordinator: ObservableObject {
     private var hudReplacementCancellable: AnyCancellable?
 
     private init() {
-        // This fork starts directly in the Spotify hover player while preserving
-        // the user's live activity preference.
+        // This fork starts directly in the Spotify hover player.
         firstLaunch = false
         currentView = .home
 
@@ -134,10 +133,11 @@ class BoringViewCoordinator: ObservableObject {
             queue: .main
         ) { notification in
             Task { @MainActor in
-                guard Defaults[.hudReplacement] else { return }
                 let granted = notification.userInfo?["granted"] as? Bool ?? false
-                if granted {
+                if granted && Defaults[.hudReplacement] {
                     await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
+                } else if !granted {
+                    MediaKeyInterceptor.shared.stop()
                 }
             }
         }
@@ -153,13 +153,13 @@ class BoringViewCoordinator: ObservableObject {
 
                     if change.newValue {
                         self.hudEnableTask = Task { @MainActor in
-                            let granted = await XPCHelperClient.shared.ensureAccessibilityAuthorization(promptIfNeeded: true)
+                            let granted = await AccessibilityAuthorizationController.shared.ensureAuthorization(
+                                promptIfNeeded: true
+                            )
                             if Task.isCancelled { return }
 
                             if granted {
                                 await MediaKeyInterceptor.shared.start()
-                            } else {
-                                Defaults[.hudReplacement] = false
                             }
                         }
                     } else {
@@ -168,16 +168,15 @@ class BoringViewCoordinator: ObservableObject {
                 }
             }
 
+        AccessibilityAuthorizationController.shared.startMonitoring()
+
         Task { @MainActor in
             helloAnimationRunning = firstLaunch
 
-            if Defaults[.hudReplacement] {
-                let authorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
-                if !authorized {
-                    Defaults[.hudReplacement] = false
-                } else {
-                    await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
-                }
+            if Defaults[.hudReplacement]
+                && AccessibilityAuthorizationController.shared.refresh()
+            {
+                await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
             }
         }
     }
