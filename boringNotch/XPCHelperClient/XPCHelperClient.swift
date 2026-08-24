@@ -1,5 +1,6 @@
 import Foundation
 import Cocoa
+import ApplicationServices
 import AsyncXPCConnection
 
 final class XPCHelperClient: NSObject {
@@ -17,7 +18,7 @@ final class XPCHelperClient: NSObject {
         stopMonitoringAccessibilityAuthorization()
     }
     
-    // MARK: - Connection Management (Main Actor Isolated)
+    // MARK: - Connection Management
     
     @MainActor
     private func ensureRemoteService() -> RemoteXPCService<BoringNotchXPCHelperProtocol> {
@@ -54,11 +55,6 @@ final class XPCHelperClient: NSObject {
     }
     
     @MainActor
-    private func getRemoteService() -> RemoteXPCService<BoringNotchXPCHelperProtocol>? {
-        remoteService
-    }
-    
-    @MainActor
     private func notifyAuthorizationChange(_ granted: Bool) {
         guard lastKnownAuthorization != granted else { return }
         lastKnownAuthorization = granted
@@ -70,17 +66,18 @@ final class XPCHelperClient: NSObject {
     }
 
     // MARK: - Monitoring
-    nonisolated func startMonitoringAccessibilityAuthorization(every interval: TimeInterval = 3.0) {
-        // Ensure only one monitor exists
+
+    nonisolated func startMonitoringAccessibilityAuthorization(every interval: TimeInterval = 1.0) {
         stopMonitoringAccessibilityAuthorization()
         monitoringTask = Task.detached { [weak self] in
-            guard let self = self else { return }
+            guard let self else { return }
             while !Task.isCancelled {
-                // Call the helper method periodically which will notify on change
                 _ = await self.isAccessibilityAuthorized()
                 do {
                     try await Task.sleep(for: .seconds(interval))
-                } catch { break }
+                } catch {
+                    break
+                }
             }
         }
     }
@@ -90,60 +87,60 @@ final class XPCHelperClient: NSObject {
         monitoringTask = nil
     }
 
-    // Expose whether the client is actively monitoring (useful for tests/debug)
     var isMonitoring: Bool {
-        return monitoringTask != nil
+        monitoringTask != nil
     }
     
     // MARK: - Accessibility
+    // Accessibility trust belongs to the process installing the event tap.
+    // The event tap lives in the main app, so checking the XPC helper here
+    // reports the wrong permission state after the user enables the app.
     
     nonisolated func requestAccessibilityAuthorization() {
-        Task {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            try? await service.withService { service in
-                service.requestAccessibilityAuthorization()
-            }
-        }
+        let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        let options = [promptKey: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
     
     nonisolated func isAccessibilityAuthorized() async -> Bool {
-        do {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            let result: Bool = try await service.withContinuation { service, continuation in
-                service.isAccessibilityAuthorized { authorized in
-                    continuation.resume(returning: authorized)
-                }
-            }
-            await MainActor.run {
-                notifyAuthorizationChange(result)
-            }
-            return result
-        } catch {
-            return false
+        let result = AXIsProcessTrusted()
+        await MainActor.run {
+            notifyAuthorizationChange(result)
         }
+        return result
     }
     
     nonisolated func ensureAccessibilityAuthorization(promptIfNeeded: Bool) async -> Bool {
-        do {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            let result: Bool = try await service.withContinuation { service, continuation in
-                service.ensureAccessibilityAuthorization(promptIfNeeded) { authorized in
-                    continuation.resume(returning: authorized)
-                }
-            }
+        if AXIsProcessTrusted() {
             await MainActor.run {
-                notifyAuthorizationChange(result)
+                notifyAuthorizationChange(true)
             }
-            return result
-        } catch {
-            return false
+            return true
         }
+
+        if promptIfNeeded {
+            requestAccessibilityAuthorization()
+        }
+
+        // System Settings updates TCC asynchronously. Keep checking long enough
+        // for the user to enable the app instead of immediately flipping the
+        // HUD replacement toggle back off.
+        let attempts = promptIfNeeded ? 120 : 1
+        for _ in 0..<attempts {
+            let trusted = AXIsProcessTrusted()
+            await MainActor.run {
+                notifyAuthorizationChange(trusted)
+            }
+            if trusted {
+                return true
+            }
+
+            if attempts > 1 {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+
+        return false
     }
     
     // MARK: - Keyboard Brightness
@@ -246,5 +243,3 @@ final class XPCHelperClient: NSObject {
 extension Notification.Name {
     static let accessibilityAuthorizationChanged = Notification.Name("accessibilityAuthorizationChanged")
 }
-
-
