@@ -268,7 +268,7 @@ private struct ClosedMusicLiveActivity: View {
     let albumArtNamespace: Namespace.ID
 
     private var totalWidth: CGFloat {
-        vm.closedNotchSize.width + 104
+        vm.closedNotchSize.width + 72
     }
 
     var body: some View {
@@ -277,15 +277,15 @@ private struct ClosedMusicLiveActivity: View {
                 .resizable()
                 .scaledToFill()
                 .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                .frame(width: 25, height: 25)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                .padding(.leading, 11)
+                .frame(width: 22, height: 22)
+                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .padding(.leading, 8)
 
             Spacer(minLength: 0)
 
             ReferenceWaveform(isPlaying: musicManager.isPlaying)
-                .frame(width: 28, height: 20)
-                .padding(.trailing, 12)
+                .frame(width: 25, height: 17)
+                .padding(.trailing, 8)
         }
         .frame(width: totalWidth, height: vm.effectiveClosedNotchHeight)
         .background(.black)

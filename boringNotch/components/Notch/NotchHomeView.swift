@@ -20,7 +20,7 @@ struct NotchHomeView: View {
 
             VStack(spacing: 0) {
                 topBlackSection
-                    .frame(height: 205)
+                    .frame(height: 184)
 
                 glassControlsSection
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -70,19 +70,19 @@ struct NotchHomeView: View {
             Color.clear
                 .frame(height: max(vm.effectiveClosedNotchHeight, 34) + 8)
 
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 artwork
-                    .frame(width: 76, height: 76)
+                    .frame(width: 66, height: 66)
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(spotifyReady ? musicManager.songTitle : "Spotify")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
                     Text(spotifyReady ? musicManager.artistName : "Open Spotify to start playing")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.58))
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -90,23 +90,23 @@ struct NotchHomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 ReferenceWaveform(isPlaying: musicManager.isPlaying)
-                    .frame(width: 30, height: 22)
+                    .frame(width: 27, height: 18)
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 20)
 
-            Spacer(minLength: 10)
+            Spacer(minLength: 8)
 
             TimelineView(.animation(minimumInterval: musicManager.isPlaying ? 0.12 : nil)) { timeline in
                 progressRow(date: timeline.date)
             }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 13)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 10)
         }
     }
 
     private var glassControlsSection: some View {
         transportControls
-            .padding(.horizontal, 28)
+            .padding(.horizontal, 26)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -143,16 +143,16 @@ struct NotchHomeView: View {
                             .scaledToFill()
                     }
                 }
-                .frame(width: 76, height: 76)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 66, height: 66)
+                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
 
                 AppIcon(for: "com.spotify.client")
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 25, height: 25)
+                    .frame(width: 22, height: 22)
                     .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.42), radius: 3, y: 1)
-                    .offset(x: 3, y: 3)
+                    .shadow(color: .black.opacity(0.42), radius: 2.5, y: 1)
+                    .offset(x: 2.5, y: 2.5)
             }
         }
         .buttonStyle(.plain)
@@ -165,9 +165,9 @@ struct NotchHomeView: View {
         let duration = max(musicManager.songDuration, 0)
         let remaining = max(duration - livePosition, 0)
 
-        return HStack(spacing: 8) {
+        return HStack(spacing: 7) {
             Text(timeString(livePosition))
-                .frame(width: 38, alignment: .leading)
+                .frame(width: 35, alignment: .leading)
 
             ReferenceScrubber(
                 value: isScrubbing ? scrubPosition : livePosition,
@@ -179,9 +179,9 @@ struct NotchHomeView: View {
             .frame(height: 13)
 
             Text("-\(timeString(remaining))")
-                .frame(width: 44, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
         }
-        .font(.system(size: 11.5, weight: .semibold))
+        .font(.system(size: 10.5, weight: .semibold))
         .foregroundStyle(Color.white.opacity(0.58))
     }
 
@@ -189,7 +189,7 @@ struct NotchHomeView: View {
         HStack(spacing: 0) {
             ReferenceTransportButton(
                 systemName: "shuffle",
-                size: 17,
+                size: 15.5,
                 active: musicManager.isShuffled,
                 action: musicManager.toggleShuffle
             )
@@ -198,7 +198,7 @@ struct NotchHomeView: View {
 
             ReferenceTransportButton(
                 systemName: "backward.fill",
-                size: 24,
+                size: 21.5,
                 action: musicManager.previousTrack
             )
 
@@ -206,16 +206,16 @@ struct NotchHomeView: View {
 
             ReferenceTransportButton(
                 systemName: musicManager.isPlaying ? "pause.fill" : "play.fill",
-                size: 28,
+                size: 25,
                 action: musicManager.togglePlay
             )
-            .frame(width: 42)
+            .frame(width: 38)
 
             Spacer()
 
             ReferenceTransportButton(
                 systemName: "forward.fill",
-                size: 24,
+                size: 21.5,
                 action: musicManager.nextTrack
             )
 
@@ -223,7 +223,7 @@ struct NotchHomeView: View {
 
             ReferenceTransportButton(
                 systemName: "laptopcomputer",
-                size: 18,
+                size: 16,
                 muted: true,
                 action: openSoundSettings
             )
@@ -280,13 +280,13 @@ private struct ReferenceScrubber: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.16))
-                    .frame(height: 4.5)
+                    .frame(height: 4)
 
                 Capsule()
                     .fill(Color.white.opacity(0.96))
                     .frame(
-                        width: max(normalized * width, normalized > 0 ? 5 : 0),
-                        height: 4.5
+                        width: max(normalized * width, normalized > 0 ? 4 : 0),
+                        height: 4
                     )
             }
             .frame(maxHeight: .infinity, alignment: .center)
@@ -331,7 +331,7 @@ private struct ReferenceTransportButton: View {
                         ? Color(red: 0.96, green: 0.49, blue: 0.58)
                         : Color.white.opacity(muted ? 0.58 : 0.97)
                 )
-                .frame(minWidth: 34, minHeight: 36)
+                .frame(minWidth: 30, minHeight: 32)
                 .scaleEffect(hovering ? 1.06 : 1)
                 .animation(.easeOut(duration: 0.12), value: hovering)
         }
@@ -344,16 +344,16 @@ struct ReferenceWaveform: View {
     let isPlaying: Bool
 
     private let barCount = 7
-    private let profile: [Double] = [0.42, 0.72, 0.94, 0.58, 1.0, 0.76, 0.48]
+    private let profile: [Double] = [0.38, 0.70, 0.92, 0.54, 1.0, 0.74, 0.44]
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.10)) { timeline in
-            HStack(alignment: .center, spacing: 2.2) {
+            HStack(alignment: .center, spacing: 2.0) {
                 ForEach(0..<barCount, id: \.self) { index in
                     Capsule()
                         .fill(Color(red: 0.95, green: 0.48, blue: 0.57))
                         .frame(
-                            width: 2.4,
+                            width: 2.2,
                             height: barHeight(index: index, date: timeline.date)
                         )
                 }
@@ -366,17 +366,17 @@ struct ReferenceWaveform: View {
         let shape = profile[index]
 
         guard isPlaying else {
-            return CGFloat(4.5 + (shape * 5.5))
+            return CGFloat(4 + (shape * 5))
         }
 
         let time = date.timeIntervalSinceReferenceDate
         let phase = Double(index) * 0.73
         let primary = (sin((time * (2.0 + Double(index) * 0.09)) + phase) + 1) * 0.5
         let secondary = (sin((time * 3.15) + phase * 1.7) + 1) * 0.5
-        let energy = 0.30 + ((primary * 0.68 + secondary * 0.32) * 0.70)
+        let energy = 0.28 + ((primary * 0.68 + secondary * 0.32) * 0.62)
         let shapedEnergy = (0.68 + shape * 0.32) * energy
 
-        return CGFloat(4.5 + shapedEnergy * 13.5)
+        return CGFloat(4 + shapedEnergy * 11.5)
     }
 }
 
